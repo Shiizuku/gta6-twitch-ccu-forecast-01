@@ -21,6 +21,8 @@ about 0.46 for flat persistence on the same folds.
 
 Fallback: if a case carries no usable comparable, the program degrades to
 persistence with a random-walk spread, so it always writes a valid file.
+The same applies when the hour-1 print itself is missing: the latest
+pre-release hourly print stands in for it rather than raising.
 
 Standard library only, deterministic, offline. Reads every *.in in the
 input directory and writes <id>.out per case to the output directory.
@@ -122,9 +124,13 @@ def forecast_case(case):
         raise ValueError("unexpected levels")
     day_start = parse_ts(case["day_start"])
     known = next((k for k in case.get("known", []) if k.get("hour") == 1), None)
-    if known is None:
-        raise ValueError("no hour-1 print")
-    p1 = max(1.0, float(known["viewers"]))
+    if known is not None:
+        p1 = max(1.0, float(known["viewers"]))
+    else:
+        hist = series_by_index(
+            day_start, case.get("history_hourly") or case.get("history"), "viewers"
+        )
+        p1 = max(1.0, hist[max(hist)]) if hist else 1.0
     hours = [row["hour"] for row in case.get("forecast", [])]
     if not hours:
         hours = list(range(2, 25))
